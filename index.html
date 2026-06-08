@@ -663,7 +663,7 @@ function syncRoma(){
   const mei=$("f_kana_mei").value.trim();
   const romaSei=cap(kanaToRoma(sei));
   const romaMei=cap(kanaToRoma(mei));
-  if(romaSei||romaMei) $("f_roma").value=(romaSei+" "+romaMei).trim();
+  if(romaSei||romaMei) $("f_roma").value=(romaMei+" "+romaSei).trim();
   if(romaSei){ $("i_slug").value=romaSei.toLowerCase(); }
   updatePreview();
 }
