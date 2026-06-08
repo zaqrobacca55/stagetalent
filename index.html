@@ -614,25 +614,44 @@ function parseFields(t){
   $("f_skill").value=normSep(pickBlock(lines,/特技/,/資格|芸歴|趣味|出演|出身|WEB|TV|CM/));
   $("f_license").value=normSep(pickBlock(lines,/資格/,/芸歴|趣味|特技|出演|出身|WEB|TV|CM|株式/));
 
-  // 出演情報：【区分】の後ろのテキストを内容として取得（行の並びに依存しない）
-  // joined全文から「【…】内容【…】内容…」を順に切り出す。
+  // 出演情報：【区分】の行を見出しとし、次の【区分】行（または芸歴セクション終端）までの
+  // 各行を「その区分の項目」として集める。区分内に複数項目があれば改行を保持するため、
+  // textareaには「区分: 項目1 / 項目2 / 項目3」の形（ / 区切り）で1行に格納する。
   const credits=[];
-  const markerRe=/[【\[]\s*([^】\]]{1,12}?)\s*[】\]]/g;
-  let mk, markers=[];
-  while((mk=markerRe.exec(joined))!==null){
-    markers.push({label:mk[1].trim(), start:mk.index, end:markerRe.lastIndex});
+  const allowRe=/^(CM|WEB|TV|MOVIE|映画|映像|舞台|ラジオ|RADIO|雑誌|広告|MV|PV|その他|ドラマ|配信|広報|モデル|出演|ナレーション|番組|イベント|ライブ|LIVE|スチール|カタログ|ゲーム|アプリ|声|吹替|VP|プロモ)$/i;
+  const markerLineRe=/^[【\[]\s*([^】\]]{1,12}?)\s*[】\]]\s*(.*)$/;
+  // 区分行に内容が同じ行に続く場合（【WEB】森永…）と、次行以降に続く場合の両対応。
+  const endLineRe=/(生年月日|年齢|性別|出身地|趣味|特技|資格|身長|株式会社|E-mail|https|TEL|FAX|芸歴|Page:|^[ＴTＢBＷWＨHＳS]\s*[：:]|\d{4}[.\/]\d{1,2}[.\/]\d{1,2})/;
+  let curLabel=null, curItems=[];
+  const flush=()=>{
+    if(curLabel && curItems.length){
+      credits.push(`${curLabel}: ${curItems.join(" / ")}`);
+    }
+    curLabel=null; curItems=[];
+  };
+  for(const ln of lines){
+    const mm=ln.match(markerLineRe);
+    if(mm){
+      // 新しい区分の開始
+      flush();
+      const lab=mm[1].trim().toUpperCase().replace(/\s/g,"");
+      if(allowRe.test(lab)){
+        curLabel=lab;
+        const rest=mm[2].trim();
+        if(rest && !endLineRe.test(rest)) curItems.push(rest.replace(/\s+/g," ").trim());
+      }else{
+        curLabel=null;
+      }
+      continue;
+    }
+    if(curLabel){
+      // 区分内の項目行。終端ワードに当たったら締める。
+      if(endLineRe.test(ln)){ flush(); continue; }
+      const item=ln.replace(/\s+/g," ").trim();
+      if(item) curItems.push(item);
+    }
   }
-  for(let k=0;k<markers.length;k++){
-    const lab=markers[k].label.toUpperCase().replace(/\s/g,"");
-    if(!/^(CM|WEB|TV|MOVIE|映画|映像|舞台|ラジオ|RADIO|雑誌|広告|MV|PV|その他|ドラマ|配信|広報|モデル|出演|ナレーション|番組|イベント|ライブ|LIVE|スチール|カタログ|ゲーム|アプリ|声|吹替|VP|プロモ)$/i.test(lab)) continue;
-    // 内容 = このマーカー末尾 〜 次マーカー先頭（または芸歴セクション終端）
-    const sliceEnd = (k+1<markers.length) ? markers[k+1].start : joined.length;
-    let body=joined.slice(markers[k].end, sliceEnd);
-    // 終端ワードで打ち切り
-    body=body.split(/生年月日|年齢|性別|出身地|趣味|特技|資格|身長|株式会社|E-mail|https|TEL|FAX|芸歴|Page:|[ＴTＢBＷWＨHＳS]\s*[：:]|\d{4}[.\/]\d{1,2}[.\/]\d{1,2}/)[0];
-    body=body.replace(/\s+/g," ").trim();
-    if(body) credits.push(`${lab}: ${body}`);
-  }
+  flush();
   if(credits.length) $("f_credits").value=credits.join("\n");
 
   updatePreview();
@@ -709,6 +728,7 @@ function buildHTML(){
   const licenseDl = dlOpt("資格",   v("f_license"));
 
   // 出演情報を「区分: 内容」の各行から動的に生成
+  // 内容中の「 / 」は区分内の項目区切り → <br>改行として出力する。
   const creditLines = v("f_credits").split("\n").map(s=>s.trim()).filter(Boolean);
   const creditDls = creditLines.map((line,ci)=>{
     const idx=line.indexOf(":");
@@ -717,6 +737,8 @@ function buildHTML(){
     let label,body;
     if(cut>=0){ label=line.slice(0,cut).trim(); body=line.slice(cut+1).trim(); }
     else { label=line.trim(); body=""; }
+    // 区分内の複数項目（ / 区切り）を改行に変換してから<br>化
+    body=body.split(/\s*\/\s*/).filter(Boolean).join("\n");
     // 最後の出演情報の末尾には「他」を付与（<br><br>他）
     const ddInner = (ci===creditLines.length-1)
       ? `${nl2br(body)}<br><br>\n\t\t\t\t\t\t\t\t\t他`
