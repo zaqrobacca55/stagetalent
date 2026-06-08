@@ -730,6 +730,8 @@ function buildHTML(){
   // 出演情報を「区分: 内容」の各行から動的に生成
   // 内容中の「 / 」は区分内の項目区切り → <br>改行として出力する。
   const creditLines = v("f_credits").split("\n").map(s=>s.trim()).filter(Boolean);
+  // 出演情報のdd内改行は、このブロックのインデント階層（タブ9個）に揃える。
+  const CIND="\t\t\t\t\t\t\t\t\t";
   const creditDls = creditLines.map((line,ci)=>{
     const idx=line.indexOf(":");
     const idx2=line.indexOf("：");
@@ -737,12 +739,13 @@ function buildHTML(){
     let label,body;
     if(cut>=0){ label=line.slice(0,cut).trim(); body=line.slice(cut+1).trim(); }
     else { label=line.trim(); body=""; }
-    // 区分内の複数項目（ / 区切り）を改行に変換してから<br>化
-    body=body.split(/\s*\/\s*/).filter(Boolean).join("\n");
-    // 最後の出演情報の末尾には「他」を付与（<br><br>他）
-    const ddInner = (ci===creditLines.length-1)
-      ? `${nl2br(body)}<br><br>\n\t\t\t\t\t\t\t\t\t他`
-      : nl2br(body);
+    // 区分内の複数項目（ / 区切り）を<br>改行で連結（インデントはこのブロックに揃える）
+    const items=body.split(/\s*\/\s*/).map(s=>s.trim()).filter(Boolean).map(esc);
+    let ddInner=items.join(`<br>\n${CIND}`);
+    // 最後の区分の末尾には「他」を付与（<br><br>他）
+    if(ci===creditLines.length-1){
+      ddInner+=`<br><br>\n${CIND}他`;
+    }
     return `\t\t\t\t\t\t\t\t<dl>
 									<dt>${esc(label)}</dt>
 									<dd>${ddInner}</dd>
