@@ -500,6 +500,15 @@ function parseFields(t){
     }else{
       kanaSeiLen=Math.ceil(kana.length/2);
     }
+    // 漢字氏名が「漢字（姓）＋ひらがな（名）」の混在で、ひらがな名部分がかなの末尾と
+    // 一致する場合（例：漢字=岡崎かのん / かな=おかざきかのん）、その一致長を名として
+    // 姓の区切りを補正する。
+    if(kanji){
+      const mix=kanji.match(/^([一-龯々〆ヶ]+)([ぁ-ん\u30fc]+)$/);
+      if(mix && kana.endsWith(mix[2]) && mix[2].length<kana.length){
+        kanaSeiLen=kana.length-mix[2].length;
+      }
+    }
   }
 
   if(kanji){
@@ -508,7 +517,12 @@ function parseFields(t){
     let disp=kanji;
     if(kanji.length>=2){
       let cut;
-      if(kana && kanaSeiLen>0 && kanaSeiLen<kana.length){
+      // 「漢字（姓）＋ひらがな（名）」混在のケース（例：岡崎かのん）を最優先で判定。
+      // 先頭が漢字で、途中からひらがなが続く場合は、その境界を姓名の区切りにする。
+      const mixMatch=kanji.match(/^([一-龯々〆ヶ]+)([ぁ-ん\u30fc]+)$/);
+      if(mixMatch && mixMatch[1].length>=1 && mixMatch[2].length>=1){
+        cut=mixMatch[1].length;
+      }else if(kana && kanaSeiLen>0 && kanaSeiLen<kana.length){
         // かな全体に対する姓の割合を漢字長に按分（最低1・最大 長さ-1）
         cut=Math.round(kanji.length*(kanaSeiLen/kana.length));
         cut=Math.min(Math.max(cut,1),kanji.length-1);
@@ -610,7 +624,7 @@ function parseFields(t){
   }
   for(let k=0;k<markers.length;k++){
     const lab=markers[k].label.toUpperCase().replace(/\s/g,"");
-    if(!/^(CM|WEB|TV|MOVIE|映画|舞台|ラジオ|RADIO|雑誌|広告|MV|PV|その他|ドラマ|配信|広報|モデル|出演|ナレーション)$/i.test(lab)) continue;
+    if(!/^(CM|WEB|TV|MOVIE|映画|映像|舞台|ラジオ|RADIO|雑誌|広告|MV|PV|その他|ドラマ|配信|広報|モデル|出演|ナレーション|番組|イベント|ライブ|LIVE|スチール|カタログ|ゲーム|アプリ|声|吹替|VP|プロモ)$/i.test(lab)) continue;
     // 内容 = このマーカー末尾 〜 次マーカー先頭（または芸歴セクション終端）
     const sliceEnd = (k+1<markers.length) ? markers[k+1].start : joined.length;
     let body=joined.slice(markers[k].end, sliceEnd);
